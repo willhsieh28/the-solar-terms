@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24節氣曆 - 雲端即時同步版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&family=Noto+Sans+TC:wght@300;400;700&family=Zhi+Mang+Xing&family=Ma+Shan+Zheng&display=swap');
+
+        :root {
+            --primary-bg: #f8f9fa;
+            --sidebar-bg: #f1f5f9;
+            --accent-red: #d63031;
+        }
+
+        .dark {
+            --primary-bg: #0f172a;
+            --sidebar-bg: #1e293b;
+        }
+
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: var(--primary-bg);
+            transition: background-color 0.3s ease;
+        }
+
+        /* 垂直文字 (背景大字) */
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            letter-spacing: 0.1em;
+            opacity: 0.8;
+            text-shadow: 0 0 10px rgba(255,255,255,0.2);
+            /* 加入下方這行，更換成您想要的字體 */
+			font-family: "Ma Shan Zheng", cursive; /* 使用馬善政字體 */
+        }
+        
+        .dark .vertical-text {
+            text-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        /* 進場動畫 */
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 0.5; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: slideInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* 印章模擬動畫 */
+        @keyframes stampEffect {
+            0% { opacity: 0; transform: scale(4); filter: blur(4px); }
+            70% { opacity: 0.8; transform: scale(0.9); filter: blur(0px); }
+            100% { opacity: 0.7; transform: scale(1); }
+        }
+        .animate-stamp {
+            animation: stampEffect 0.5s cubic-bezier(0.17, 0.89, 0.32, 1.28) forwards;
+            animation-delay: 0.8s;
+            opacity: 0;
+        }
+
+        .seal {
+            border: 2px solid var(--accent-red);
+            color: var(--accent-red);
+            width: 44px; /* 稍微加大寬度確保直排空間 */
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            background-color: rgba(255, 255, 255, 0.6);
+            margin: 15px auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            
+            /* --- 關鍵修正：強制文字流變為直排 --- */
+            writing-mode: vertical-rl;      /* 強制文字從右到左、由上至下垂直排列 */
+            text-orientation: upright;     /* 確保中文字保持正向，不會橫躺 */
+            letter-spacing: -0.1em;        /* 縮短字距讓兩個字在圓圈內更緊湊 */
+            line-height: 1;                /* 設定行高為 1，避免字距過大 */
+            font-family: 'Ma Shan Zheng', cursive; /* 建議搭配書法體，印章感更強 */
+        }
+
+        @media (min-width: 768px) {
+            .sidebar-scroll {
+                scrollbar-width: thin;
+                scrollbar-color: #cbd5e1 transparent;
+                overflow-y: auto;
+            }
+            .sidebar-scroll::-webkit-scrollbar {
+                width: 5px;
+            }
+            .sidebar-scroll::-webkit-scrollbar-thumb {
+                background: #cbd5e1;
+                border-radius: 10px;
+            }
+            .dark .sidebar-scroll::-webkit-scrollbar-thumb {
+                background: #475569;
+            }
+        }
+
+        .term-btn.active {
+            background-color: #10b981 !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            border-color: #10b981 !important;
+        }
+
+        /* 強制修正介紹文字樣式 - 淺色模式 */
+        #termDesc {
+            /* 推薦色彩：#047857 (翡翠綠) 或 #0e7490 (青藍色)，比純黑更具生機 */
+            color: #047857 !important; 
+            font-style: italic !important; /* 保持斜體效果 */
+            font-weight: 600 !important; /* 建議提高至 600，增加斜體在彩色下的清晰度 */
+        }
+
+        /* 必備：確保深色模式下文字不會保持黑色 */
+        .dark #termDesc {
+            color: #f1f5f9 !important; /* 回復為淺灰色/白色 */
+        }
+
+        /* 修改農曆數值的顏色與發光效果 */
+        #dateL {
+            color: #FF5F1F !important; /* 螢光橘色 (Neon Orange) */
+            text-shadow: 0 0 5px rgba(255, 95, 31, 0.3); /* 淡淡的發光感 */
+        }
+
+        /* 確保深色模式下螢光橘依然亮眼 */
+        .dark #dateL {
+            color: #FF7518 !important; /* 深色模式稍微調亮一點點 */
+            text-shadow: 0 0 8px rgba(255, 117, 24, 0.5);
+        }
+    </style>
+</head>
+<body class="text-slate-900 dark:text-slate-100 min-h-screen">
+
+    <div id="app" class="flex flex-col md:flex-row min-h-screen md:h-screen md:overflow-hidden">
+        
+        <!-- 側邊欄 -->
+        <aside class="w-full md:w-72 lg:w-80 bg-[var(--sidebar-bg)] p-6 flex flex-col border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 shrink-0">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h1 class="text-xl font-black text-emerald-600 dark:text-emerald-400">廿四節氣曆</h1>
+                    <p class="text-sm font-bold uppercase tracking-[0.2em] bg-gradient-to-r from-orange-400 to-amber-600 bg-clip-text text-transparent">
+                        節氣是季節的信使
+                    </p>
+                </div>
+                <button onclick="toggleDarkMode()" class="p-2 rounded-xl bg-white/50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-300">
+                    <i data-lucide="sun" id="sun-icon" class="hidden w-5 h-5"></i>
+                    <i data-lucide="moon" id="moon-icon" class="hidden w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">年份切換</label>
+                <select id="yearSelect" onchange="fetchData()" class="w-full p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-700 outline-none text-sm shadow-sm cursor-pointer focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                    <option value="2025">西元 2025 (民國 114)</option>
+                    <option value="2026">西元 2026 (民國 115)</option>
+                    <option value="2027">西元 2027 (民國 116)</option>
+                </select>
+            </div>
+
+            <div class="md:flex-1 md:overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tighter">節氣時序表</p>
+                    <div class="h-[1px] flex-1 bg-slate-300 dark:bg-slate-700 ml-4 opacity-30"></div>
+                </div>
+                <div id="termList" class="grid grid-cols-2 gap-2 sidebar-scroll pb-6 md:pb-0">
+                    <!-- JS 動態生成 -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主內容區 -->
+        <main class="flex-1 bg-[var(--primary-bg)] p-4 md:p-8 lg:p-12 flex flex-col items-center md:overflow-y-auto relative min-h-[500px]">
+            <div id="contentDisplay" class="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 opacity-0 transition-opacity duration-700">
+                
+                <!-- 左側：圖片與直排文字 -->
+                <div class="lg:col-span-7 relative">
+                    <div class="rounded-3xl overflow-hidden shadow-2xl aspect-[4/3] bg-slate-200 dark:bg-slate-800">
+                        <img id="termImg" src="" alt="節氣圖片" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80'">
+                    </div>
+                    
+                    <div class="absolute top-6 left-6 md:top-10 md:left-10 pointer-events-none">
+                        <div id="termName" class="vertical-text text-6xl md:text-8xl font-normal text-slate-950 dark:text-white">
+                            <!-- 節氣名稱 -->
+                        </div>
+                        <div id="sealWrapper">
+                             <div id="termSeal" class="seal"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：文字詳細資訊 (優化區) -->
+                <div class="lg:col-span-5 flex flex-col justify-start lg:pt-4 space-y-8">
+                    <div class="space-y-4">
+                        <div class="inline-block px-3 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold border border-emerald-500/20">
+                            Solar Term Essence
+                        </div>
+                        
+                        <!-- 修正：節氣精華改為綠色 -->
+                        <h2 class="text-2xl md:text-5xl font-black tracking-tight text-emerald-600 dark:text-emerald-400" id="detailTitle">
+                            節氣精華
+                        </h2>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                            <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-md border border-slate-100 dark:border-slate-700">
+                                <p class="text-[12px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">西元日期</p>
+                                <b id="dateG" class="text-xl font-bold text-slate-900 dark:text-slate-100"></b>
+                            </div>
+                            <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-md border border-slate-100 dark:border-slate-700">
+                                <p class="text-[12px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">農曆</p>
+                                <b id="dateL" class="text-xl font-bold text-slate-900 dark:text-slate-100"></b>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 修正：介紹文字顏色明確設為深黑色 (text-slate-950)，確保淺色模式清晰 -->
+                    <div id="descBox" class="text-xl leading-relaxed text-slate-950 dark:text-slate-100 pt-6 font-medium italic border-l-4 border-emerald-500 pl-6 bg-emerald-50/20 dark:bg-emerald-900/10 rounded-r-2xl shadow-inner">
+                        <span id="termDesc" class="block leading-snug">載入中...</span>
+                    </div>
+
+                    <div class="pt-8 border-t border-slate-200 dark:border-slate-800 mt-auto opacity-50 text-[10px] flex items-center justify-between text-slate-600 dark:text-slate-400 pb-10 md:pb-0">
+                        <span class="font-bold tracking-widest uppercase">© <span id="footerYear"></span> 24 SOLAR TERMS SYSTEM</span>
+                        <span class="flex items-center"><span class="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2 animate-pulse"></span>LIVE SYNC ACTIVE</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="loader" class="absolute inset-0 flex flex-col items-center justify-center space-y-4 bg-[var(--primary-bg)] z-50">
+                <div class="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-xs font-bold tracking-widest text-slate-500 dark:text-slate-400 uppercase">Synchronizing Sheets...</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- 設定區 ---
+        const SPREADSHEET_ID = '1vGuuL0JBFy_2Hbu0nYN2udi8q6loKOF6DlGAzQ0omUw'; 
+        // -------------
+
+        let solarData = [];
+        let isDark = false;
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme === 'dark');
+            } else {
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                applyTheme(systemDark);
+            }
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+                if (!localStorage.getItem('theme')) applyTheme(e.matches);
+            });
+        }
+
+        function applyTheme(dark) {
+            isDark = dark;
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('sun-icon').classList.remove('hidden');
+                document.getElementById('moon-icon').classList.add('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('sun-icon').classList.add('hidden');
+                document.getElementById('moon-icon').classList.remove('hidden');
+            }
+        }
+
+        function toggleDarkMode() {
+            const target = !isDark;
+            applyTheme(target);
+            localStorage.setItem('theme', target ? 'dark' : 'light');
+        }
+
+        function setupDefaultYear() {
+            const currentYear = new Date().getFullYear();
+            const select = document.getElementById('yearSelect');
+            let exists = false;
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value == currentYear) {
+                    select.selectedIndex = i;
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                const option = document.createElement("option");
+                option.value = currentYear;
+                option.text = `西元 ${currentYear} (民國 ${currentYear - 1911})`;
+                select.add(option, select.options[0]);
+                select.value = currentYear;
+            }
+        }
+
+        async function fetchData() {
+            const year = document.getElementById('yearSelect').value;
+            const loader = document.getElementById('loader');
+            const content = document.getElementById('contentDisplay');
+            
+            loader.style.display = 'flex';
+            content.style.opacity = '0';
+
+            const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${year}&t=${Date.now()}`;
+
+            try {
+                const response = await fetch(url);
+                const text = await response.text();
+                const json = JSON.parse(text.substring(47).slice(0, -2));
+                
+                const rows = json.table.rows;
+                solarData = rows.map(row => {
+                    let dateG = "";
+                    const cell = row.c[1];
+                    if (cell) dateG = cell.f || cell.v || "";
+
+                    return {
+                        name: row.c[0]?.v || '',
+                        dateG: dateG,
+                        dateL: row.c[2]?.v || '',
+                        desc: row.c[3]?.v || '',
+                        img: row.c[4]?.v || ''
+                    };
+                });
+
+                renderList();
+                
+                // 自動尋找並顯示最接近今日日期的節氣
+                const closestIdx = findClosestTermIndex();
+                showTerm(closestIdx); 
+                
+                loader.style.display = 'none';
+                content.style.opacity = '1';
+                
+                // 自動將清單滾動到該節氣位置
+                setTimeout(() => {
+                    const activeBtn = document.getElementById(`btn-${closestIdx}`);
+                    if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 500);
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('termDesc').innerText = '同步失敗。請確認試算表已發布且 ID 正確。';
+                loader.style.display = 'none';
+            }
+        }
+
+        function findClosestTermIndex() {
+            const now = new Date();
+            let minDiff = Infinity;
+            let closestIndex = 0;
+
+            solarData.forEach((term, index) => {
+                const termDate = new Date(term.dateG);
+                if (isNaN(termDate.getTime())) return;
+
+                const diff = Math.abs(termDate - now);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIndex = index;
+                }
+            });
+            return closestIndex;
+        }
+
+        function renderList() {
+            const listContainer = document.getElementById('termList');
+            listContainer.innerHTML = '';
+            
+            solarData.forEach((term, index) => {
+                const btn = document.createElement('button');
+                btn.className = `term-btn p-4 text-left rounded-2xl transition-all duration-300 bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 text-slate-900 dark:text-slate-100`;
+                btn.id = `btn-${index}`;
+                btn.onclick = () => {
+                    showTerm(index);
+                    if (window.innerWidth < 768) {
+                        window.scrollTo({ top: document.querySelector('main').offsetTop, behavior: 'smooth' });
+                    }
+                };
+                
+                let shortDate = term.dateG;
+                if (shortDate.includes('/')) {
+                    const parts = shortDate.split('/');
+                    if (parts.length >= 3) shortDate = `${parts[1]}/${parts[2]}`;
+                }
+
+                btn.innerHTML = `
+                    <div class="text-sm font-black mb-1">${term.name}</div>
+                    <div class="text-[14px] text-slate-500 dark:text-slate-400 font-medium tracking-normal">${shortDate}</div>
+                `;
+                listContainer.appendChild(btn);
+            });
+        }
+
+        function showTerm(index) {
+            const term = solarData[index];
+            if (!term) return;
+
+            document.querySelectorAll('.term-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-${index}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const nameEl = document.getElementById('termName');
+            const sealEl = document.getElementById('termSeal');
+            
+            nameEl.style.opacity = '0';
+            sealEl.classList.remove('animate-stamp');
+            void sealEl.offsetWidth; 
+
+            setTimeout(() => {
+                nameEl.innerText = term.name;
+                document.getElementById('dateG').innerText = term.dateG;
+                document.getElementById('dateL').innerText = term.dateL;
+                document.getElementById('termDesc').innerText = term.desc;
+                document.getElementById('termImg').src = term.img;
+                
+                let lunarYear = "";
+                if (term.dateL && term.dateL.length >= 2) {
+                    lunarYear = term.dateL.substring(0, 2);
+                } else {
+                    const yearSelect = document.getElementById('yearSelect').value;
+                    lunarYear = getZodiacFallback(parseInt(yearSelect));
+                }
+                sealEl.innerText = lunarYear;
+                
+                nameEl.classList.remove('animate-fade-in');
+                void nameEl.offsetWidth; 
+                nameEl.classList.add('animate-fade-in');
+                sealEl.classList.add('animate-stamp');
+            }, 50);
+        }
+
+        function getZodiacFallback(year) {
+            const tg = ["庚", "辛", "壬", "癸", "甲", "乙", "丙", "丁", "戊", "己"];
+            const dz = ["申", "酉", "戌", "亥", "子", "丑", "寅", "卯", "辰", "巳", "午", "未"];
+            return tg[year % 10] + dz[year % 12];
+        }
+
+        window.onload = () => {
+            lucide.createIcons();
+            initTheme();
+            setupDefaultYear();
+            document.getElementById('footerYear').innerText = new Date().getFullYear();
+            fetchData();
+        };
+    </script>
+</body>
+</html>
