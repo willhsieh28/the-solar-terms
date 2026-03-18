@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>24節氣曆 - 雲端即時同步版</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&family=Noto+Sans+TC:wght@300;400;700&family=Zhi+Mang+Xing&family=Ma+Shan+Zheng&display=swap');
@@ -108,6 +113,11 @@
             color: white !important;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
             border-color: #10b981 !important;
+        }
+        
+        /* 修正：切換成選中狀態後，裡面的子元素(日期)也應強制變換顏色 */
+        .term-btn.active div {
+            color: white !important;
         }
 
         /* 強制修正介紹文字樣式 - 淺色模式 */
